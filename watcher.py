@@ -57,8 +57,14 @@ TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523
 
 MIN_SOL_TRANSFER = 10_000_000     # $ — seuil d'alerte transferts whales Solana
 MIN_ETH_TRANSFER = 150_000_000    # $ — seuil d'alerte mouvements Binance HW20
-HEARTBEAT_SECS = 7 * 86400        # 1 message de vie par semaine
 MAX_TX_PER_ACCOUNT = 10           # limite de tx analysées par compte et par run
+
+# Rapport de vie : chaque dimanche à partir de 9h (heure de Paris)
+try:
+    from zoneinfo import ZoneInfo
+    PARIS_TZ = ZoneInfo("Europe/Paris")
+except Exception:
+    PARIS_TZ = timezone.utc
 
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state.json")
 
@@ -427,19 +433,34 @@ def main():
         )
         if w1_usdc is not None:
             msg += f"💰 Réserve Wallet 1 : {fmt_usd(w1_usdc)} USDC en attente\n"
-        msg += "\nVérification toutes les ~15 min. Vie du bot confirmée chaque semaine."
+        msg += ("\nVérification toutes les ~15 min. "
+                "Rapport de vie chaque dimanche vers 9h.")
         send_telegram(msg)
         state["last_heartbeat"] = now
-    elif now - state.get("last_heartbeat", 0) > HEARTBEAT_SECS:
-        msg = (
-            "✅ <b>Whale Watch opérationnel</b> (rapport hebdomadaire)\n"
-            f"₿ BTC : ${fmt_usd(price) if price else '?'}\n"
+    else:
+        local_now = datetime.now(PARIS_TZ)
+        sunday_report_due = (
+            local_now.weekday() == 6            # dimanche
+            and local_now.hour >= 9             # à partir de 9h (Paris)
+            and now - state.get("last_heartbeat", 0) > 2 * 86400
         )
-        if w1_usdc is not None:
-            msg += f"💰 Réserve Wallet 1 : {fmt_usd(w1_usdc)} USDC\n"
-        msg += "Aucune action requise. Les alertes arrivent dès qu'un whale bouge."
-        send_telegram(msg)
-        state["last_heartbeat"] = now
+        if sunday_report_due:
+            w2 = balances.get(WHALE_2) or {}
+            msg = (
+                "📋 <b>Rapport du dimanche — Whale Watch actif</b> ✅\n"
+                f"🗓 {local_now.strftime('%d/%m/%Y')}\n\n"
+                f"₿ BTC : ${fmt_usd(price) if price else '?'}\n"
+            )
+            if w1_usdc is not None:
+                msg += f"💰 Réserve Wallet 1 : {fmt_usd(w1_usdc)} USDC\n"
+            w2_total = (w2.get(USDC_MINT) or 0) + (w2.get(USDT_MINT) or 0)
+            msg += (
+                f"💰 Réserve Wallet 2 : {fmt_usd(w2_total)} USDC+USDT\n"
+                f"👁 {len(state['last_sig'])} comptes surveillés\n\n"
+                "Aucune action requise. Les alertes arrivent dès qu'un whale bouge."
+            )
+            send_telegram(msg)
+            state["last_heartbeat"] = now
 
     for msg in alerts:
         send_telegram(msg)

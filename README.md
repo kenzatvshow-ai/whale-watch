@@ -22,8 +22,9 @@ quand le pattern historique se déclenche.
   de −8 % à −27 % (distribution, pas accumulation)
 - 📥 **Recharge Binance → whale** = possible creux de marché (pattern fév 2026)
 
-Le bot envoie aussi un message de démarrage et un rapport de vie hebdomadaire
-(avec la réserve USDC du Wallet 1), pour que tu saches qu'il tourne toujours.
+Le bot envoie aussi un message de démarrage et un **rapport chaque dimanche
+vers 9h** (prix BTC, réserves des whales, comptes surveillés), pour que tu
+saches qu'il tourne toujours.
 
 ---
 
