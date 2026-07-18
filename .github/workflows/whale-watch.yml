@@ -1,0 +1,40 @@
+name: Whale Watch
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # toutes les 15 min (GitHub peut ajouter 5-15 min de délai)
+  workflow_dispatch: {}       # lancement manuel possible depuis l'onglet Actions
+
+# Sécurité : permissions minimales — juste de quoi sauvegarder state.json
+permissions:
+  contents: write
+
+concurrency:
+  group: whale-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Action épinglée sur un commit SHA précis (protection supply-chain)
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Surveillance des wallets
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 watcher.py
+
+      - name: Sauvegarde de l'état
+        run: |
+          if ! git diff --quiet state.json; then
+            git config user.name "whale-watch-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add state.json
+            git commit -m "maj état de surveillance"
+            git pull --rebase
+            git push
+          fi

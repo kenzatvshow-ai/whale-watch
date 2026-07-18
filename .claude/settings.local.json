@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc -t markdown '/c/Users/manue/Desktop/claude code analyse crypto V2.docx' -o __TRACKED_VAR__/doc.md)",
+      "Bash(pandoc -t markdown \"C:\\\\Users\\\\manue\\\\Desktop\\\\claude code analyse crypto V2.docx\")",
+      "Read(//c/Users/manue/AppData/Local/Temp/claude/C--Users-manue-Desktop-bot-telegram/59003526-fa86-4900-acc7-c4461f5741a8/scratchpad/unpacked/**)",
+      "Bash(sed -e 's/<w:p [^>]*>/\\\\n/g; s/<w:p>/\\\\n/g' word/document.xml)",
+      "Bash(sed -e 's/<[^>]*>//g')",
+      "Read(//c/Users/manue/Desktop/**)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "Bash(py --version)",
+      "Bash(python watcher.py --dry-run)"
+    ]
+  }
+}
