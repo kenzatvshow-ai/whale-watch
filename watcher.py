@@ -77,7 +77,7 @@ MIN_B14_DEPOSIT = 50_000_000      # $ — seuil dépôts externes vers Binance 1
 MIN_TETHER = 50_000_000           # $ — seuil impressions / déploiements Tether
 MAX_TX_PER_ACCOUNT = 10           # limite de tx analysées par compte et par run
 
-# Rapport de vie : chaque dimanche à partir de 9h (heure de Paris)
+# Rapport quotidien : à partir de 12h (heure de Paris)
 try:
     from zoneinfo import ZoneInfo
     PARIS_TZ = ZoneInfo("Europe/Paris")
@@ -531,34 +531,45 @@ def main():
         if w1_usdc is not None:
             msg += f"💰 Réserve Wallet 1 : {fmt_usd(w1_usdc)} USDC en attente\n"
         msg += ("\nVérification toutes les ~15 min. "
-                "Rapport de vie chaque dimanche vers 9h.")
+                "Rapport quotidien à 12h (heure de Paris).")
         send_telegram(msg)
         state["last_heartbeat"] = now
     else:
         local_now = datetime.now(PARIS_TZ)
-        sunday_report_due = (
-            local_now.weekday() == 6            # dimanche
-            and local_now.hour >= 9             # à partir de 9h (Paris)
-            and now - state.get("last_heartbeat", 0) > 2 * 86400
+        today = local_now.strftime("%Y-%m-%d")
+        report_due = (
+            local_now.hour >= 12                     # à partir de midi (Paris)
+            and state.get("last_report_day") != today
         )
-        if sunday_report_due:
+        if report_due:
+            if price is None:
+                zone = "⚪️ Prix BTC indisponible"
+            elif price < 90_000:
+                zone = "🔥 ZONE FORTE — achat historique (BTC &lt; 90k$)"
+            elif price < 100_000:
+                zone = "🟡 Zone intermédiaire (90-100k$)"
+            else:
+                zone = "🔴 Zone de prudence (BTC &gt; 100k$)"
             w2 = balances.get(WHALE_2) or {}
+            w2_total = (w2.get(USDC_MINT) or 0) + (w2.get(USDT_MINT) or 0)
             msg = (
-                "📋 <b>Rapport du dimanche — Whale Watch actif</b> ✅\n"
+                "📋 <b>Whale Watch — Rapport quotidien</b>\n"
                 f"🗓 {local_now.strftime('%d/%m/%Y')}\n\n"
                 f"₿ BTC : ${fmt_usd(price) if price else '?'}\n"
+                f"{zone}\n\n"
             )
             if w1_usdc is not None:
-                msg += f"💰 Réserve Wallet 1 : {fmt_usd(w1_usdc)} USDC\n"
-            w2_total = (w2.get(USDC_MINT) or 0) + (w2.get(USDT_MINT) or 0)
+                msg += f"🐋 Wallet 1 (H8BgJ) : {fmt_usd(w1_usdc)} USDC en réserve\n"
             msg += (
-                f"💰 Réserve Wallet 2 : {fmt_usd(w2_total)} USDC+USDT\n"
-                f"👁 {len(state['last_sig'])} comptes Solana suivis\n"
-                "✅ Surveillance active — 6 signaux monitorés\n\n"
-                "Aucune action requise. Les alertes arrivent dès qu'un whale bouge."
+                f"🐋 Wallet 2 (9WzDX) : {fmt_usd(w2_total)} USDC+USDT\n"
+                "🐳 Whale ETH 0x2213 : DCA → Binance 14 surveillé\n"
+                "🏦 Binance 14 : dépôts externes ≥ 50M$\n"
+                "🏦 Binance HW20 : mouvements ≥ 150M$\n"
+                "🖨 Tether : impressions + USDT → Binance\n\n"
+                "✅ Surveillance active — 6 signaux monitorés"
             )
             send_telegram(msg)
-            state["last_heartbeat"] = now
+            state["last_report_day"] = today
 
     for msg in alerts:
         send_telegram(msg)
