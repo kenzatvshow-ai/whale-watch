@@ -134,8 +134,13 @@ def send_telegram(text):
             },
         )
     except urllib.error.HTTPError as e:
-        # Ne jamais afficher l'URL (elle contient le token).
-        print(f"ERREUR Telegram: HTTP {e.code}")
+        # Ne jamais afficher l'URL (elle contient le token) — seulement le
+        # code et la description renvoyée par Telegram.
+        try:
+            detail = json.loads(e.read().decode()).get("description", "")
+        except Exception:
+            detail = ""
+        print(f"ERREUR Telegram: HTTP {e.code} — {detail}")
         sys.exit(1)
 
 
