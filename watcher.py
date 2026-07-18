@@ -39,6 +39,7 @@ SOLANA_RPCS = [
 ]
 ETH_RPCS = [
     "https://ethereum-rpc.publicnode.com",
+    "https://eth.drpc.org",
     "https://eth.llamarpc.com",
 ]
 
@@ -52,11 +53,28 @@ USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 MINT_NAMES = {USDC_MINT: "USDC", USDT_MINT: "USDT"}
 
 BINANCE_HW20 = "0xf977814e90da44bfa03b6295a0616a897441acec"
+BINANCE_14 = "0x28c6c06298d514db089934071355e5743bf21d60"
+WHALE_ETH = "0x22132139bf7f3921b1cadeab931f4fbf7bf2bc9e"   # DCA USDT -> Binance 14
+TETHER_TREASURY = "0x5754284f345afc66a98fbb0a0afe71e0f007b949"
+# Wallets Binance connus (pour distinguer flux internes / dépôts externes)
+KNOWN_BINANCE_ETH = {
+    BINANCE_HW20,
+    BINANCE_14,
+    "0xbe0eb53f46cd790cd13851d5eff43d12404d33e8",  # Binance 7
+    "0x21a31ee1afc51d94c2efccaa2092ad1028285549",  # Binance 15
+    "0xdfd5293d8e347dfe59e90efd55b2956a1343963d",  # Binance 16
+    "0x56eddb7aa87536c09ccc2793473599fd21a8b17f",  # Binance 17
+    "0x9696f59e4d72e237be84ffd425dcad154bf96976",  # Binance 18
+}
 USDT_ETH = "0xdac17f958d2ee523a2206206994597c13d831ec7"
 TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+ISSUE_TOPIC = "0xcb8241adb0c3fdb35b70c24ce35c5eb0c17af7431c99f827d44a445ca624176a"
 
 MIN_SOL_TRANSFER = 10_000_000     # $ — seuil d'alerte transferts whales Solana
 MIN_ETH_TRANSFER = 150_000_000    # $ — seuil d'alerte mouvements Binance HW20
+MIN_WHALE_ETH = 10_000_000        # $ — seuil d'alerte whale ETH 0x2213
+MIN_B14_DEPOSIT = 50_000_000      # $ — seuil dépôts externes vers Binance 14
+MIN_TETHER = 50_000_000           # $ — seuil impressions / déploiements Tether
 MAX_TX_PER_ACCOUNT = 10           # limite de tx analysées par compte et par run
 
 # Rapport de vie : chaque dimanche à partir de 9h (heure de Paris)
@@ -329,7 +347,9 @@ def pad_addr(addr):
     return "0x" + "0" * 24 + addr[2:].lower()
 
 
-def check_binance_hw20(state, price, alerts):
+def check_ethereum(state, price, alerts):
+    """5 signaux USDT sur Ethereum : whale 0x2213, impressions Tether,
+    Tether -> Binance, dépôts externes Binance 14, gros mouvements HW20."""
     try:
         latest = int(eth_rpc("eth_blockNumber", []), 16)
     except Exception as e:
@@ -340,51 +360,125 @@ def check_binance_hw20(state, price, alerts):
     if last_block is None:
         state["eth_last_block"] = latest
         return
-    from_block = max(last_block + 1, latest - 5000)
+    from_block = max(last_block + 1, latest - 4000)
     if from_block > latest:
         return
 
     seen = set()
-    for topics in (
-        [TRANSFER_TOPIC, pad_addr(BINANCE_HW20)],          # sorties
-        [TRANSFER_TOPIC, None, pad_addr(BINANCE_HW20)],    # entrées
-    ):
-        try:
-            logs = eth_rpc(
-                "eth_getLogs",
-                [{
-                    "address": USDT_ETH,
-                    "fromBlock": hex(from_block),
-                    "toBlock": hex(latest),
-                    "topics": topics,
-                }],
-            ) or []
-        except Exception as e:
-            print(f"WARN eth_getLogs: {e}")
-            return  # on retentera tout le range au prochain run
 
+    def new_logs(topics):
+        logs = eth_rpc(
+            "eth_getLogs",
+            [{
+                "address": USDT_ETH,
+                "fromBlock": hex(from_block),
+                "toBlock": hex(latest),
+                "topics": topics,
+            }],
+        ) or []
+        fresh = []
         for log in logs:
             key = (log.get("transactionHash"), log.get("logIndex"))
-            if key in seen:
+            if key not in seen:
+                seen.add(key)
+                fresh.append(log)
+        return fresh
+
+    def transfer_parts(log):
+        amount = int(log["data"], 16) / 1e6
+        sender = "0x" + log["topics"][1][-40:]
+        receiver = "0x" + log["topics"][2][-40:]
+        return amount, sender, receiver
+
+    def tx_link(log):
+        return f"🔗 etherscan.io/tx/{log.get('transactionHash')}"
+
+    signal, _ = classify_signal(price)
+    btc_line = f"₿ BTC : ${fmt_usd(price) if price else '?'}"
+
+    try:
+        # 1) Whale ETH 0x2213 — DCA USDT vers Binance 14
+        for log in (new_logs([TRANSFER_TOPIC, pad_addr(WHALE_ETH)])
+                    + new_logs([TRANSFER_TOPIC, None, pad_addr(WHALE_ETH)])):
+            amount, sender, receiver = transfer_parts(log)
+            if amount < MIN_WHALE_ETH:
                 continue
-            seen.add(key)
+            if sender == WHALE_ETH:
+                if receiver == BINANCE_14:
+                    dest = "→ <b>BINANCE 14</b> ✅ (DCA en cours)"
+                elif receiver in KNOWN_BINANCE_ETH:
+                    dest = "→ Binance"
+                else:
+                    dest = f"→ {receiver[:10]}…"
+                alerts.append(
+                    f"🐳 <b>WHALE ETH 0x2213…bc9e</b>\n"
+                    f"💸 Sortie : <b>{fmt_usd(amount)} USDT</b> {dest}\n"
+                    f"{btc_line}\n\n{signal}\n{tx_link(log)}"
+                )
+            else:
+                alerts.append(
+                    f"🐳 <b>WHALE ETH 0x2213…bc9e</b>\n"
+                    f"📥 Entrée : <b>{fmt_usd(amount)} USDT</b> "
+                    f"depuis {sender[:10]}…\n"
+                    f"{btc_line}\n{tx_link(log)}"
+                )
+
+        # 2) Impressions Tether (nouveaux USDT créés)
+        for log in new_logs([ISSUE_TOPIC]):
             amount = int(log["data"], 16) / 1e6
+            if amount < MIN_TETHER:
+                continue
+            alerts.append(
+                f"🖨 <b>TETHER IMPRIME</b>\n"
+                f"💵 Nouveaux USDT créés : <b>{fmt_usd(amount)} USDT</b>\n"
+                f"{btc_line}\n\n"
+                "ℹ️ Les grosses impressions de USDT précèdent souvent une "
+                "injection de liquidité sur les exchanges.\n"
+                f"{tx_link(log)}"
+            )
+
+        # 3) Trésorerie Tether → Binance (USDT frais déployés)
+        for log in new_logs([TRANSFER_TOPIC, pad_addr(TETHER_TREASURY)]):
+            amount, _sender, receiver = transfer_parts(log)
+            if amount < MIN_TETHER or receiver not in KNOWN_BINANCE_ETH:
+                continue
+            alerts.append(
+                f"💵 <b>TETHER → BINANCE</b>\n"
+                f"USDT frais déployés : <b>{fmt_usd(amount)} USDT</b>\n"
+                f"{btc_line}\n\n{signal}\n{tx_link(log)}"
+            )
+
+        # 4) Binance 14 — dépôts externes (hors wallets Binance connus)
+        for log in new_logs([TRANSFER_TOPIC, None, pad_addr(BINANCE_14)]):
+            amount, sender, _receiver = transfer_parts(log)
+            if (amount < MIN_B14_DEPOSIT or sender in KNOWN_BINANCE_ETH
+                    or sender == TETHER_TREASURY):
+                continue
+            alerts.append(
+                f"🏦 <b>BINANCE 14 — DÉPÔT EXTERNE</b>\n"
+                f"📥 <b>{fmt_usd(amount)} USDT</b> depuis {sender[:10]}…\n"
+                f"{btc_line}\n\n{signal}\n{tx_link(log)}"
+            )
+
+        # 5) Binance HW20 — gros mouvements (internes ou externes)
+        for log in (new_logs([TRANSFER_TOPIC, pad_addr(BINANCE_HW20)])
+                    + new_logs([TRANSFER_TOPIC, None, pad_addr(BINANCE_HW20)])):
+            amount, sender, receiver = transfer_parts(log)
             if amount < MIN_ETH_TRANSFER:
                 continue
-            sender = "0x" + log["topics"][1][-40:]
-            receiver = "0x" + log["topics"][2][-40:]
             direction = ("📤 Sortie" if sender == BINANCE_HW20 else "📥 Entrée")
-            signal, _ = classify_signal(price)
             alerts.append(
                 f"🏦 <b>BINANCE HOT WALLET 20</b> (Ethereum)\n"
                 f"{direction} : <b>{fmt_usd(amount)} USDT</b>\n"
                 f"De {sender[:10]}… vers {receiver[:10]}…\n"
-                f"₿ BTC : ${fmt_usd(price) if price else '?'}\n\n"
+                f"{btc_line}\n\n"
                 "ℹ️ Historique : les gros mouvements HW20 avec BTC &lt; 92k$ ont "
                 "précédé les plus fortes hausses (+15% à +24% en 4 semaines).\n"
-                f"{signal}\n"
-                f"🔗 etherscan.io/tx/{log.get('transactionHash')}"
+                f"{signal}\n{tx_link(log)}"
             )
+    except Exception as e:
+        print(f"WARN eth_getLogs: {e}")
+        return  # on retentera tout le range au prochain run
 
     state["eth_last_block"] = latest
 
@@ -417,7 +511,7 @@ def main():
     alerts = []
 
     balances = check_solana_whales(state, price, alerts)
-    check_binance_hw20(state, price, alerts)
+    check_ethereum(state, price, alerts)
 
     w1_usdc = (balances.get(WHALE_1) or {}).get(USDC_MINT)
     now = time.time()
@@ -425,10 +519,13 @@ def main():
     if first_run:
         msg = (
             "🤖 <b>Whale Watch démarré</b>\n\n"
-            "Surveillance active :\n"
-            "• Wallet 1 (H8BgJ…5hss) — USDC/USDT Solana\n"
-            "• Wallet 2 (9WzDX…AWWM) — USDC/USDT Solana\n"
-            "• Binance Hot Wallet 20 — USDT Ethereum (≥ 150M$)\n\n"
+            "Surveillance active — 6 signaux :\n"
+            "🐋 Wallet 1 (H8BgJ…5hss) — USDC/USDT Solana\n"
+            "🐋 Wallet 2 (9WzDX…AWWM) — USDC/USDT Solana\n"
+            "🐳 Whale ETH 0x2213…bc9e — DCA USDT → Binance 14\n"
+            "🏦 Binance 14 (ETH) — dépôts externes ≥ 50M$\n"
+            "🏦 Binance HW20 (ETH) — mouvements ≥ 150M$\n"
+            "🖨 Tether — impressions + USDT frais → Binance\n\n"
             f"₿ BTC actuel : ${fmt_usd(price) if price else '?'}\n"
         )
         if w1_usdc is not None:
@@ -456,7 +553,8 @@ def main():
             w2_total = (w2.get(USDC_MINT) or 0) + (w2.get(USDT_MINT) or 0)
             msg += (
                 f"💰 Réserve Wallet 2 : {fmt_usd(w2_total)} USDC+USDT\n"
-                f"👁 {len(state['last_sig'])} comptes surveillés\n\n"
+                f"👁 {len(state['last_sig'])} comptes Solana suivis\n"
+                "✅ Surveillance active — 6 signaux monitorés\n\n"
                 "Aucune action requise. Les alertes arrivent dès qu'un whale bouge."
             )
             send_telegram(msg)

@@ -7,11 +7,14 @@ quand le pattern historique se déclenche.
 
 ## 📊 Ce que le bot surveille
 
-| Wallet | Chaîne | Rôle | Alerte si |
+| Signal | Chaîne | Rôle | Alerte si |
 |---|---|---|---|
-| `H8BgJ…5hss` (Wallet 1) | Solana | Whale, ~687M USDC en réserve | transfert USDC/USDT ≥ 10M$ (entrée ou sortie) |
+| `H8BgJ…5hss` (Wallet 1) | Solana | Whale, grosse réserve USDC | transfert USDC/USDT ≥ 10M$ (entrée ou sortie) |
 | `9WzDX…AWWM` (Wallet 2) | Solana | Whale SOL, même compte Binance | transfert USDC/USDT ≥ 10M$ |
+| `0x2213…bc9e` (Whale ETH) | Ethereum | Whale en DCA USDT → Binance 14 | transfert USDT ≥ 10M$ |
+| `0x28C6…1d60` (Binance 14) | Ethereum | Wallet de dépôt Binance | dépôt externe USDT ≥ 50M$ |
 | `0xF977…aceC` (Binance HW20) | Ethereum | Réservoir central Binance | mouvement USDT ≥ 150M$ |
+| Tether (mint + trésorerie) | Ethereum | Émetteur du USDT | impression ≥ 50M$, ou USDT frais → Binance ≥ 50M$ |
 
 ## 🚦 Règles de signal (issues de l'analyse historique)
 
