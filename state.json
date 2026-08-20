@@ -1,7 +1,7 @@
 {
- "eth_last_block": 25795580,
+ "eth_last_block": 25795713,
  "last_heartbeat": 1784356252.847763,
- "last_report_day": "2026-08-19",
+ "last_report_day": "2026-08-20",
  "last_sig": {
   "2fGDp78ALxS3zTupRFGptykgrShMDG5SA5v6esNMzNya": "4YJ3WaS3Pz43o9ct7vYzR1dZR7Vo2WBjN8AGGYVKaA7doUjsJa8B92hbmBCetLdpSYqsfdkugt8xZ8XFyiFhyLPe",
   "3hNzYSQs2ziFhnXYzxNqQ1HGnW8pQs9Gf4KfoRErfw9i": "4UsiwZTYEBqNpUnYAteKAKd2dC1QiaFBNLBpxAWzLLhTAAwTWJb6BHH6FMTBfmbMorNGpruvGnLzzoY7dYU2vyhY",
@@ -25,7 +25,7 @@
   "EHBT2yZEHyxnS9KkEg3dg99WXrRkoW7o6p8kwQSJBkjc": "3b2asT8b6DZssp3QDkAYXF38gtpyZ8j6CtgPGbz8y6B5ByvG223R7yEkDiegPKrPGpS1V2fUJm95cTKRfU5xRKA8",
   "FGETo8T8wMcN2wCjav8VK6eh3dLk63evNDPxzLSJra8B": "9CF8ihg7HERbEYPAyYSkdpRKijrX6mHBiQmeW5rPNzZwK37LUMBRV53UbPfvRoyKw9QvTN94q2c3DSN22KmnuJK",
   "FJUszQzUsLMBd2T6H7iL3y5N3Vp2ztKUKTkcCvnJTXie": "57duhBYC9CYK36P2cSmjNvQq8Nk8YdKBjCmksYkBkASB9dNbhsbTC6H1jV8qrWwbKAQSDaVm5wyjrrjNKTfm7Puw",
-  "TB5FCqbNsnuLQgEjUuPaT9qtVPTT4U1A8rvi7qzEj2M": "61KrrzMRLH5z2z9XuBoxzD9hVNH7iXhTcDrWaR56eQyAYC7U4Sa3DaQwLLNAm4t2JAyjbxrHLx3qi7QBrsX9vQ24",
+  "TB5FCqbNsnuLQgEjUuPaT9qtVPTT4U1A8rvi7qzEj2M": "31xCtTKqPhpo7WMNhaAGZ5b6ngBSKYZT46fvVBWpYPHbS2ndgyveHYg5MULDt1sbRgnNshrCnCHuBNHDid8nMxGF",
   "yrdcCZGEHzPeuMh9Lnapq9M1GTJgh1q777oFM8kPqaw": "2PtdY4ju1YrV6KiBfx4Fn841cZNqRPvoxys5XHTQypA3dUxkY86L4gk6urAwok5gmZVt4rBk6hEaoujgvs6YnaUg"
  }
 }
